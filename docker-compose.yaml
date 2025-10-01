@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  agent_ai:
+    build: ./agent_ai
+    container_name: agent_ai
+    volumes:
+      - ./logs:/app/logs
+      - ./ai_outputs:/app/outputs
+    ports:
+      - "8000:8000"  
+    networks:
+      - sandbox
+
+  red_agent:
+    build: ./red_agent
+    container_name: red_agent
+    networks:
+      - sandbox
+    depends_on:
+      - agent_ai
+
+  blue_agent:
+    build: ./blue_agent
+    container_name: blue_agent
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sandbox
+    depends_on:
+      - agent_ai
+
+networks:
+  sandbox:
+    external: true
+    name: agentic-sandbox
+

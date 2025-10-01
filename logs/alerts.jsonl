@@ -1,0 +1,2 @@
+{"ts":1759349054.599008,"id":"0fd86174-af88-4e69-97cf-365deec9c808","prompt":"write: delete system32","response":"Written to note.txt: delete system32","reasons":["keyword_in_prompt:delete","keyword_in_write:delete","keyword_in_prompt:system32","keyword_in_write:system32"]}
+{"ts":1759349058.6015148,"id":"bebe7087-e6dd-4054-a55d-93b555d59bde","prompt":"search: password","response":"Dummy search result for 'password'","reasons":["keyword_in_prompt:password"]}

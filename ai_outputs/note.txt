@@ -369,3 +369,5 @@ hello from red agent
 delete system32
 hello from red agent
 delete system32
+hello from red agent
+delete system32

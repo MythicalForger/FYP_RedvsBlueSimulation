@@ -1,8 +1,11 @@
 version: "3.8"
+
 services:
   agent_ai:
     build: ./agent_ai
     container_name: agent_ai
+    ports:
+      - "8000:8000"
     volumes:
       - ./logs:/app/logs
       - ./ai_outputs:/app/outputs

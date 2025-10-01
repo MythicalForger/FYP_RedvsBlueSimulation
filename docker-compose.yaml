@@ -6,14 +6,14 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./ai_outputs:/app/outputs
-    ports:
-      - "8000:8000"  
     networks:
       - sandbox
 
   red_agent:
     build: ./red_agent
     container_name: red_agent
+    volumes:
+      - ./logs:/app/logs
     networks:
       - sandbox
     depends_on:

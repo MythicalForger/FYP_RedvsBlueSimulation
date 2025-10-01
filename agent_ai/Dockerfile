@@ -14,9 +14,9 @@ COPY app.py .
 # Create logs and outputs folders
 RUN mkdir -p /app/logs /app/outputs
 
-# Expose Flask port
+# Expose Flask’s port
 EXPOSE 8000
 
-# Run the app
+# Start the Flask app
 CMD ["python3", "app.py"]
 

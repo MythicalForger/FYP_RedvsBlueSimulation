@@ -12,9 +12,13 @@ services:
     networks:
       - sandbox
 
-  red_agent:
-    build: ./red_agent
-    container_name: red_agent
+  blue_agent:
+    build: ./blue_agent
+    container_name: blue_agent
+    ports:
+      - "8001:8001"         # ✅ expose Blue's Flask server
+    environment:
+      - AGENT_AI_URL=http://agent_ai:8000/prompt   # ✅ tell Blue where to forward safe prompts
     volumes:
       - ./logs:/app/logs
     networks:
@@ -22,15 +26,17 @@ services:
     depends_on:
       - agent_ai
 
-  blue_agent:
-    build: ./blue_agent
-    container_name: blue_agent
+  red_agent:
+    build: ./red_agent
+    container_name: red_agent
     volumes:
       - ./logs:/app/logs
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red now targets Blue
     networks:
       - sandbox
     depends_on:
-      - agent_ai
+      - blue_agent       # ✅ must start *after* Blue, not Agent AI
 
 networks:
   sandbox:

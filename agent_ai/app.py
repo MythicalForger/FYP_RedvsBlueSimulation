@@ -22,11 +22,14 @@ def prompt():
     prompt_id = payload.get("id", str(uuid.uuid4()))
     ts = time.time()
 
+    # Log that we received a request (role kept as red_request for compatibility)
     event = {
         "ts": ts,
         "id": prompt_id,
         "role": "red_request",
-        "prompt": text
+        "prompt": text,
+        # record whether it came via Blue (optional header)
+        "via_blue": request.headers.get("X-Via-Blue", "true")
     }
     write_event({**event, "stage": "received"})
 
@@ -65,5 +68,5 @@ def prompt():
     return jsonify({"response": response})
 
 if __name__ == "__main__":
+    # debug=False is fine in container; expose default 8000
     app.run(host="0.0.0.0", port=8000, debug=False)
-

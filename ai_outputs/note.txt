@@ -398,8 +398,6 @@ delete system32
 hello from red agent
 delete system32
 hello from red agent
-<<<<<<< HEAD
-=======
 delete system32
 hello from red agent
 delete system32
@@ -412,8 +410,6 @@ hello from red agent
 hello from red agent
 hello from red agent
 hello from red agent
-<<<<<<< HEAD
-=======
 hello from red agent
 hello from red agent
 hello from red agent

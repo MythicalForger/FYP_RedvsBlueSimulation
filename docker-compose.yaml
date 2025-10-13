@@ -38,8 +38,40 @@ services:
     depends_on:
       - blue_agent       # ✅ must start *after* Blue, not Agent AI
 
+  monitoring_api:
+    build: 
+      context: ./monitoring
+      dockerfile: Dockerfile
+    container_name: monitoring_api
+    ports:
+      - "9000:9000"
+>>>>>>> pkbranch
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red now targets Blue
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent       # ✅ must start *after* Blue, not Agent AI
+
+  monitoring_dashboard:
+    build:
+      context: ./monitoring
+      dockerfile: dashboard.Dockerfile
+    container_name: monitoring_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sandbox
+    depends_on:
+      - monitoring_api
+
 networks:
   sandbox:
     external: true
     name: agentic-sandbox
+
 

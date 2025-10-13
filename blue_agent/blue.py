@@ -107,3 +107,9 @@ def intercept_prompt():
 if __name__ == "__main__":
     print("[BLUE] Starting Blue Gatekeeper on :8001, forwarding to", AGENT_AI_URL)
     app.run(host="0.0.0.0", port=8001, debug=False)
+
+>>>>>>> pkbranch
+
+if __name__ == "__main__":
+    print("[BLUE] Starting Blue Gatekeeper on :8001, forwarding to", AGENT_AI_URL)
+    app.run(host="0.0.0.0", port=8001, debug=False)

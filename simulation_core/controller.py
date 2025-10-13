@@ -7,6 +7,9 @@ Place at: sandbox/simulation_core/controller.py
 Usage examples:
   python controller.py --duration 60 --mode baseline
   python controller.py --duration 120 --mode defended
+  python controller.py --duration 60 --mode baseline --dashboard
+  python controller.py --duration 60 --dashboard --build
+>>>>>>> pkbranch
 """
 
 import os
@@ -159,7 +162,8 @@ def save_audit(run_id, params, metrics):
     print("[CTRL] audit saved to", out_path)
     return out_path
 
-def run_experiment(duration_seconds=60, mode="baseline", build=False):
+def run_experiment(duration_seconds=60, mode="baseline", build=False, dashboard=False):
+>>>>>>> pkbranch
     run_id = str(uuid.uuid4())[:8]
     print(f"[CTRL] Starting experiment run_id={run_id} mode={mode} duration={duration_seconds}s")
 
@@ -167,6 +171,13 @@ def run_experiment(duration_seconds=60, mode="baseline", build=False):
 
     # baseline: start agent_ai + blue_agent (no red), then later start red
     services_start = ["agent_ai", "blue_agent"]
+    
+    # Add monitoring services if dashboard is requested
+    if dashboard:
+        services_start.extend(["monitoring_api", "monitoring_dashboard"])
+        print("[CTRL] Including monitoring dashboard...")
+    
+>>>>>>> pkbranch
     compose_up(services_start, build=build)
     # small wait for services to come up
     print("[CTRL] waiting for services to initialize...")
@@ -178,6 +189,15 @@ def run_experiment(duration_seconds=60, mode="baseline", build=False):
         print("[CTRL] red_agent started.")
     else:
         print("[CTRL] unknown mode; not starting red agent.")
+    
+    # Show dashboard URL if enabled
+    if dashboard:
+        print("\n" + "="*60)
+        print("📊 MONITORING DASHBOARD AVAILABLE!")
+        print("🌐 Dashboard URL: http://localhost:8501")
+        print("🔧 Monitoring API: http://localhost:9000")
+        print("="*60 + "\n")
+>>>>>>> pkbranch
 
     # sleep while simulation runs
     start = time.time()
@@ -209,10 +229,12 @@ def main():
     p.add_argument("--duration", type=int, default=60, help="Duration of simulation in seconds")
     p.add_argument("--mode", type=str, default="baseline", help="Experiment mode: baseline|defended")
     p.add_argument("--build", action="store_true", help="Run docker compose with --build")
+    p.add_argument("--dashboard", action="store_true", help="Include monitoring dashboard")
     args = p.parse_args()
 
     try:
-        audit, metrics = run_experiment(duration_seconds=args.duration, mode=args.mode, build=args.build)
+        audit, metrics = run_experiment(duration_seconds=args.duration, mode=args.mode, build=args.build, dashboard=args.dashboard)
+>>>>>>> pkbranch
         print("[CTRL] Done. Audit:", audit)
     except Exception as e:
         print("[CTRL] Experiment failed:", e)

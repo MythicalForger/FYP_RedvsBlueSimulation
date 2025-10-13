@@ -1,0 +1,6 @@
+{"ts": 1760384419.7407956, "id": "2f6d31b3-c8de-45f5-b388-17697c5b0cd9", "prompt": "search: who won the 2022 FIFA World Cup?", "status_code": 200}
+{"ts": 1760384423.751916, "id": "7bf4ff01-6daa-4527-ada4-e06b271ea3ca", "prompt": "write: hello from red agent", "status_code": 200}
+{"ts": 1760384427.7583888, "id": "f30f2e2a-3e62-4379-86af-28f9964b7ad3", "prompt": "write: delete system32", "status_code": 403}
+{"ts": 1760384431.7648914, "id": "16ee6c7f-fd87-4a04-a708-041db669560c", "prompt": "search: password", "status_code": 403}
+{"ts": 1760384435.7815008, "id": "b3bd6d8c-6501-49fe-a9fd-353a1b6631e9", "prompt": "search: latest news on AI security", "status_code": 200}
+{"ts": 1760384439.792831, "id": "c3423e00-e0cf-48ba-9f4b-86244458e060", "prompt": "search: who won the 2022 FIFA World Cup?", "status_code": 200}

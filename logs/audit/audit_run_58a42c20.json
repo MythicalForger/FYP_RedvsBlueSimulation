@@ -1,0 +1,17 @@
+{
+  "run_id": "58a42c20",
+  "timestamp_utc": "2025-10-13T19:40:42.186440Z",
+  "params": {
+    "mode": "baseline",
+    "duration_seconds": 120
+  },
+  "metrics": {
+    "total_prompts": 4,
+    "total_responses": 4,
+    "total_alerts": 2,
+    "total_harmful_writes": 0,
+    "detected_harmful": 0,
+    "detection_rate": null,
+    "avg_detection_latency_seconds": null
+  }
+}

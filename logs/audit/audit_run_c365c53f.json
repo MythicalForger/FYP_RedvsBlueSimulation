@@ -1,0 +1,17 @@
+{
+  "run_id": "c365c53f",
+  "timestamp_utc": "2025-10-13T19:43:30.136881Z",
+  "params": {
+    "mode": "baseline",
+    "duration_seconds": 120
+  },
+  "metrics": {
+    "total_prompts": 20,
+    "total_responses": 20,
+    "total_alerts": 13,
+    "total_harmful_writes": 0,
+    "detected_harmful": 0,
+    "detection_rate": null,
+    "avg_detection_latency_seconds": null
+  }
+}

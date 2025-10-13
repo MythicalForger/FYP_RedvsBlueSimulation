@@ -12,19 +12,39 @@ services:
     networks:
       - sandbox
 
+  blue_agent:
+    build: ./blue_agent
+    container_name: blue_agent
+    ports:
+      - "8001:8001"         # ✅ expose Blue's Flask server
+    environment:
+      - AGENT_AI_URL=http://agent_ai:8000/prompt   # ✅ tell Blue where to forward safe prompts
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sandbox
+    depends_on:
+      - agent_ai
+
   red_agent:
     build: ./red_agent
     container_name: red_agent
     volumes:
       - ./logs:/app/logs
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red now targets Blue
     networks:
       - sandbox
     depends_on:
-      - agent_ai
+      - blue_agent       # ✅ must start *after* Blue, not Agent AI
 
-  blue_agent:
-    build: ./blue_agent
-    container_name: blue_agent
+  monitoring_api:
+    build: 
+      context: ./monitoring
+      dockerfile: Dockerfile
+    container_name: monitoring_api
+    ports:
+      - "9000:9000"
     volumes:
       - ./logs:/app/logs
     networks:
@@ -32,8 +52,23 @@ services:
     depends_on:
       - agent_ai
 
+  monitoring_dashboard:
+    build:
+      context: ./monitoring
+      dockerfile: dashboard.Dockerfile
+    container_name: monitoring_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sandbox
+    depends_on:
+      - monitoring_api
+
 networks:
   sandbox:
     external: true
     name: agentic-sandbox
+
 

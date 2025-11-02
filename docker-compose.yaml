@@ -16,11 +16,14 @@ services:
     build: ./blue_agent
     container_name: blue_agent
     ports:
-      - "8001:8001"         # ✅ expose Blue's Flask server
+      - "8001:8001"                      # ✅ Blue's Flask service
     environment:
-      - AGENT_AI_URL=http://agent_ai:8000/prompt   # ✅ tell Blue where to forward safe prompts
+      - AGENT_AI_URL=http://agent_ai:8000/prompt   # ✅ Forward safe prompts to Agent AI
+      - USE_LLM_REASONING=true                      # 🧠 Enable LLM-based reasoning
+      - LLM_MODEL=gemma:2b                          # 💬 Model used via Ollama
     volumes:
       - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock   # optional if Ollama runs as a container
     networks:
       - sandbox
     depends_on:
@@ -32,11 +35,11 @@ services:
     volumes:
       - ./logs:/app/logs
     environment:
-      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red now targets Blue
+      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red sends to Blue
     networks:
       - sandbox
     depends_on:
-      - blue_agent       # ✅ must start *after* Blue, not Agent AI
+      - blue_agent       # ✅ must start after Blue
 
   monitoring_api:
     build: 
@@ -45,15 +48,14 @@ services:
     container_name: monitoring_api
     ports:
       - "9000:9000"
->>>>>>> pkbranch
     volumes:
       - ./logs:/app/logs
     environment:
-      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red now targets Blue
+      - BLUE_URL=http://blue_agent:8001/prompt
     networks:
       - sandbox
     depends_on:
-      - blue_agent       # ✅ must start *after* Blue, not Agent AI
+      - blue_agent
 
   monitoring_dashboard:
     build:
@@ -73,5 +75,4 @@ networks:
   sandbox:
     external: true
     name: agentic-sandbox
-
 

@@ -18,7 +18,7 @@ import argparse
 import requests
 import socket
 from datetime import datetime
->>>>>>> pkbranch
+
 
 # -------- Configuration & Path selection --------
 DEFAULT_BLUE = os.environ.get("BLUE_URL", "http://blue_agent:8001/prompt")
@@ -230,4 +230,4 @@ def main():
 if __name__ == "__main__":
     main()
 
->>>>>>> pkbranch
+

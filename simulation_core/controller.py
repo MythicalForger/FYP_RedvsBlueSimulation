@@ -9,7 +9,7 @@ Usage examples:
   python controller.py --duration 120 --mode defended
   python controller.py --duration 60 --mode baseline --dashboard
   python controller.py --duration 60 --dashboard --build
->>>>>>> pkbranch
+
 """
 
 import os
@@ -163,7 +163,7 @@ def save_audit(run_id, params, metrics):
     return out_path
 
 def run_experiment(duration_seconds=60, mode="baseline", build=False, dashboard=False):
->>>>>>> pkbranch
+
     run_id = str(uuid.uuid4())[:8]
     print(f"[CTRL] Starting experiment run_id={run_id} mode={mode} duration={duration_seconds}s")
 
@@ -177,7 +177,7 @@ def run_experiment(duration_seconds=60, mode="baseline", build=False, dashboard=
         services_start.extend(["monitoring_api", "monitoring_dashboard"])
         print("[CTRL] Including monitoring dashboard...")
     
->>>>>>> pkbranch
+
     compose_up(services_start, build=build)
     # small wait for services to come up
     print("[CTRL] waiting for services to initialize...")
@@ -197,7 +197,7 @@ def run_experiment(duration_seconds=60, mode="baseline", build=False, dashboard=
         print("🌐 Dashboard URL: http://localhost:8501")
         print("🔧 Monitoring API: http://localhost:9000")
         print("="*60 + "\n")
->>>>>>> pkbranch
+
 
     # sleep while simulation runs
     start = time.time()
@@ -234,7 +234,7 @@ def main():
 
     try:
         audit, metrics = run_experiment(duration_seconds=args.duration, mode=args.mode, build=args.build, dashboard=args.dashboard)
->>>>>>> pkbranch
+
         print("[CTRL] Done. Audit:", audit)
     except Exception as e:
         print("[CTRL] Experiment failed:", e)

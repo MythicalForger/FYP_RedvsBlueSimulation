@@ -29,13 +29,13 @@ def prompt():
 
 
     # Log that we received a request
->>>>>>> pkbranch
+
     event = {
         "id": prompt_id,
         "role": "red_request",
         "prompt": text,
 
->>>>>>> pkbranch
+
         "via_blue": request.headers.get("X-Via-Blue", "true")
     }
     write_jsonl(LOG_JSONL, {**event, "stage": "received"})
@@ -77,5 +77,5 @@ if __name__ == "__main__":
     # debug=False is fine in container; expose default 8000
 
     print("[AGENT_AI] Running on :8000")
->>>>>>> pkbranch
+
     app.run(host="0.0.0.0", port=8000, debug=False)

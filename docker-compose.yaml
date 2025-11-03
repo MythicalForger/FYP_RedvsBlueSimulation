@@ -1,4 +1,6 @@
-version: "3.8"
+# 🧩 Agentic AI Sandbox - Full Multi-Agent System
+# Runs Blue (defender), Red (attacker), Agent AI (LLM), and Monitoring Stack.
+# Includes optional training modules retrainer + suggestion_generator.
 
 services:
   agent_ai:
@@ -16,14 +18,14 @@ services:
     build: ./blue_agent
     container_name: blue_agent
     ports:
-      - "8001:8001"                      # ✅ Blue's Flask service
+      - "8001:8001"
     environment:
-      - AGENT_AI_URL=http://agent_ai:8000/prompt   # ✅ Forward safe prompts to Agent AI
-      - USE_LLM_REASONING=true                      # 🧠 Enable LLM-based reasoning
-      - LLM_MODEL=gemma:2b                          # 💬 Model used via Ollama
+      - AGENT_AI_URL=http://agent_ai:8000/prompt
+      - USE_LLM_REASONING=true
+      - LLM_MODEL=gemma:2b
     volumes:
       - ./logs:/app/logs
-      - /var/run/docker.sock:/var/run/docker.sock   # optional if Ollama runs as a container
+      - /var/run/docker.sock:/var/run/docker.sock   # For Ollama if containerized
     networks:
       - sandbox
     depends_on:
@@ -34,15 +36,16 @@ services:
     container_name: red_agent
     volumes:
       - ./logs:/app/logs
+      - ./red_agent:/app
     environment:
-      - BLUE_URL=http://blue_agent:8001/prompt      # ✅ Red sends to Blue
+      - BLUE_URL=http://blue_agent:8001/prompt
     networks:
       - sandbox
     depends_on:
-      - blue_agent       # ✅ must start after Blue
+      - blue_agent
 
   monitoring_api:
-    build: 
+    build:
       context: ./monitoring
       dockerfile: Dockerfile
     container_name: monitoring_api
@@ -70,6 +73,36 @@ services:
       - sandbox
     depends_on:
       - monitoring_api
+
+  # 🧠 Offline Retrainer - learns from logs to adjust Red’s scoring/weights
+  retrainer:
+    build: ./red_agent
+    container_name: retrainer
+    user: "${USER_ID}:${GROUP_ID}"
+    command: ["python", "retrainer.py"]
+    volumes:
+      - ./logs:/app/logs
+      - ./red_agent:/app
+    networks:
+      - sandbox
+    depends_on:
+      - monitoring_api
+    profiles: ["training"]
+
+  # 💡 Suggestion Generator - proposes new attack templates post-retraining
+  suggestion_generator:
+    build: ./red_agent
+    container_name: suggestion_generator
+    user: "${USER_ID}:${GROUP_ID}"
+    command: ["python", "suggestions.py"]
+    volumes:
+      - ./logs:/app/logs
+      - ./red_agent:/app
+    networks:
+      - sandbox
+    depends_on:
+      - retrainer
+    profiles: ["training"]
 
 networks:
   sandbox:

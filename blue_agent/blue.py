@@ -15,7 +15,108 @@ LOG_FILE = "/app/logs/ai_events.jsonl"
 ALERTS_FILE = "/app/logs/alerts.jsonl"
 INTERCEPT_LOG = "/app/logs/blue_intercept.jsonl"
 
-SUSPICIOUS_KEYWORDS = ["delete", "system32", "password", "config", "hack", "exploit"]
+SUSPICIOUS_KEYWORDS = [
+    # destructive / filesystem commands
+    "delete", "d3lete", "d3l3t3", "d[e]l[e]t[e]", "remove file", "remove", "rm -rf",
+    "rm -rf /", "sudo rm -rf", "erase", "erase disk", "format", "format c:", "format drive",
+    "wipe", "wipe data", "destroy files", "corrupt files", "overwrite", "overwrite boot",
+    "boot sector", "bootsector", "ntldr", "bootmgr", "bootloader", "kernel32", "system32",
+    "windows\\system32", "delete system32", "destroy system", "purge system",
+
+    # credentials / secrets / keys
+    "password", "pa$$word", "passw0rd", "pwd", "passwd", "pass-word", "pass word",
+    "api key", "apikey", "api_key", "secret", "secr3t", "token", "access token",
+    "private key", "privatekey", "ssh key", "ssh-key", "sshkey", "credential", "creds",
+    "login info", "login credentials", "decrypt", "decode", "crack password", "bruteforce",
+    "brute force", "hash crack", "steal credentials", "expose credentials",
+
+    # config / security controls
+    "config", "configuration", "reset config", "override config", "modify config",
+    "delete config", "disable security", "disable safety", "disable guardrails",
+    "disable firewall", "disable antivirus", "disable av", "disable checks",
+    "bypass authentication", "bypass auth", "bypass filter", "ignore safety",
+    "override safety", "override restrictions", "disable filters", "bypass filters",
+
+    # execution / shell / remote execution
+    "exec", "execute", "execute command", "run command", "system command", "os.system",
+    "subprocess.run", "popen(", "eval(", "exec(", "bash -c", "cmd.exe", "sh -c",
+    "shell command", "terminal command", "run code", "import os", "import subprocess",
+    "import sys", "powershell", "pwsh", "cmd /c", "start-process", "spawn shell",
+
+    # remote access / backdoor / reverse shell
+    "reverse shell", "bind shell", "reverse-shell", "bind-shell", "open backdoor",
+    "open a backdoor", "backdoor", "remote shell", "remote exec", "psexec", "rce",
+    "remote code execution", "rce exploit", "ssh", "telnet", "scp", "sftp", "ftp", "rlogin",
+    "sshpass", "ssh-key", "ssh-keygen", "upload shell", "download shell",
+
+    # database / sql / data manipulation
+    "sql injection", "sql-injection", "union select", "union all select", "or 1=1",
+    "drop table", "delete from", "truncate table", "insert into", "update set",
+    "select * from", "dump database", "dump table", "database dump", "dump all",
+
+    # data exfiltration / transfer / send
+    "exfiltrate", "exfil", "leak", "leak data", "send data", "send file", "upload file",
+    "download file", "transfer file", "post file", "post to webhook", "webhook",
+    "curl ", "wget ", "ftp ", "scp ", "http post", "http get", "send via email",
+    "send to", "email file", "mail to", "smtp", "send logs", "upload logs", "data dump",
+
+    # malware / exploit / payload
+    "exploit", "xploit", "exploit code", "payload", "shellcode", "malware", "ransomware",
+    "keylogger", "spyware", "trojan", "virus", "backdoor", "implant", "rootkit",
+    "install malware", "deploy payload", "run payload", "deliver payload",
+
+    # privilege escalation / root / sudo
+    "privilege escalation", "privilege-escalation", "elevate privilege", "gain root",
+    "root access", "become root", "su -", "sudo ", "sudo su", "setuid", "setgid",
+    "chown", "chmod", "setfacl", "icacls", "adduser", "useradd", "usermod",
+
+    # prompt injection / jailbreak / bypass
+    "ignore previous", "ignore previous instructions", "ignore all previous",
+    "forget previous instructions", "bypass safety", "bypass moderation",
+    "override filters", "override safety", "prompt injection", "prompt-injection",
+    "jailbreak", "jail break", "do anything now", "developer mode", "unfiltered output",
+    "unfiltered", "no filters", "no safety", "DAN", "do anything now", "simulate unsafe mode",
+    "system prompt", "reveal hidden instructions", "reveal system prompt", "reveal secrets",
+
+    # suspicious verbs near objects (phrases)
+    "open file", "read file", "write file", "append file", "delete file", "read /etc/passwd",
+    "cat /etc/passwd", "cat /etc/shadow", "read /etc/shadow", "read shadow", "read passwd",
+    "ls -la", "list directory", "list files", "list folders", "dir /s", "dir /b",
+
+    # obfuscation / leet / bracketed variants (literal strings to detect common tricks)
+    "h4ck", "h4x0r", "h4x", "h@ck", "p@ssword", "pa$$", "p@ss", "d3l3t3", "d[e]l[e]t[e]",
+    "syst3m32", "syst3m", "conf1g", "c0nfig", "byp@ss", "byp4ss", "0verride", "0verr1de",
+
+    # tools / commands that often indicate automation/execution
+    "curl -X", "curl -o", "wget http", "powershell -nop -w hidden", "powershell -enc",
+    "invoke-webrequest", "invoke-expression", "python -c", "perl -e", "ruby -e",
+    "nc -l", "nc -e", "netcat", "socat", "mshta", "regsvr32", "certutil -urlcache -f",
+
+    # social-engineering / exfil phrases
+    "send credentials", "share password", "expose credentials", "expose secret",
+    "send me the password", "give me your password", "give me the api key",
+    "copy secrets", "copy keys", "download secrets", "collect emails", "harvest emails",
+
+    # anything explicitly about bypassing or disabling protections
+    "disable protection", "disable monitoring", "turn off monitoring", "stop logging",
+    "disable audit", "delete logs", "clear logs", "wipe logs", "remove audit",
+
+    # suspicious developer/test keywords that often indicate 'breakout' instructs
+    "debug mode", "developer mode", "test mode", "simulate unsafe", "run unfiltered",
+    "full access", "grant full access", "grant admin", "give me root", "give root",
+
+    # short dangerous tokens/indicators
+    "root", "admin", "administrator", "system", "shell", "cmd", "console", "terminal",
+    "backdoor", "exploit-db", "exploitdb", "metasploit", "msfconsole", "msfvenom",
+
+    # other explicit dangerous phrases
+    "format all", "wipe all", "factory reset", "factory-reset", "hard reset",
+    "disable safeguards", "turn off safeguards", "unauthorized access", "unauthorised access",
+
+    # catch-all suspicious words (high-level)
+    "attack", "compromise", "breach", "breach data", "data breach", "expose data",
+    "spyware", "credential stuffing", "credential theft", "unauthorised", "unauthorized"
+]
 
 os.makedirs("/app/logs", exist_ok=True)
 for f in [LOG_FILE, ALERTS_FILE, INTERCEPT_LOG]:

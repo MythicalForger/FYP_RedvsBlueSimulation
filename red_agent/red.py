@@ -1,12 +1,9 @@
+#!/usr/bin/env python3
 """
-Robust Red Agent for the Red-vs-Blue simulation.
-
-Key behavior:
-- Loads attacks.json next to this script.
-- Uses BLUE_URL from environment (default: docker host name `blue_agent`).
-- Falls back to localhost if docker DNS not resolvable.
-- Writes logs with ISO 8601 timestamps to a writable path.
-- Sends prompts to Blue agent continuously.
+Red Agent (patched):
+- Sends attack prompts to Blue.
+- Logs attack_id with every outgoing prompt (for retraining).
+- Uses weighted sampling based on "weight" field in attacks.json.
 """
 
 import os
@@ -19,10 +16,8 @@ import requests
 import socket
 from datetime import datetime
 
-
 # -------- Configuration & Path selection --------
 DEFAULT_BLUE = os.environ.get("BLUE_URL", "http://blue_agent:8001/prompt")
-
 
 def resolve_host(hostname: str) -> bool:
     try:
@@ -30,7 +25,6 @@ def resolve_host(hostname: str) -> bool:
         return True
     except Exception:
         return False
-
 
 BLUE_URL = DEFAULT_BLUE
 if DEFAULT_BLUE.startswith(("http://", "https://")):
@@ -62,13 +56,11 @@ def write_jsonl(path: str, obj: dict):
     line = json.dumps(obj, separators=(",", ":"))
     with open(path, "a", encoding="utf-8") as f:
         f.write(line + "\n")
-    print(line)  # also print to stdout
-
+    print(line)
 
 # -------- Attack corpus --------
 HERE = os.path.dirname(os.path.abspath(__file__))
 ATTACKS_FILE = os.path.join(HERE, "attacks.json")
-
 
 def load_corpus(path=ATTACKS_FILE):
     if not os.path.exists(path):
@@ -85,7 +77,6 @@ def load_corpus(path=ATTACKS_FILE):
         print("[RED] Failed to load attacks.json:", e)
         return []
 
-
 # -------- Mutators --------
 def mutate_whitespace(s):
     parts = s.split()
@@ -94,10 +85,8 @@ def mutate_whitespace(s):
         parts[i] += random.choice([" ", "  ", "\n", "\u200b"])
     return " ".join(parts)
 
-
 def mutate_case(s):
     return " ".join(word.upper() if random.random() < 0.35 else word.lower() for word in s.split())
-
 
 def insert_polite_wrapper(s):
     wrappers = [
@@ -107,7 +96,6 @@ def insert_polite_wrapper(s):
         "Debug mode:",
     ]
     return f"{random.choice(wrappers)} {s}".strip()
-
 
 def safe_obfuscate_keywords(s):
     replacements = {
@@ -122,12 +110,26 @@ def safe_obfuscate_keywords(s):
         s = s.replace(k, v)
     return s
 
-
 MUTATORS = [mutate_whitespace, mutate_case, insert_polite_wrapper, safe_obfuscate_keywords]
 
+# -------- Weighted sampling helper --------
+def weighted_choice(corpus):
+    if not corpus:
+        return None
+    total = sum(float(a.get("weight", 1.0)) for a in corpus)
+    if total <= 0:
+        return random.choice(corpus)
+    r = random.random() * total
+    upto = 0.0
+    for a in corpus:
+        w = float(a.get("weight", 1.0))
+        if upto + w >= r:
+            return a
+        upto += w
+    return corpus[-1]
 
 # -------- Send to Blue Agent --------
-def send_prompt(text, prompt_id=None, timeout=10):
+def send_prompt(text, attack_id=None, prompt_id=None, timeout=10):
     if not text:
         return
     if prompt_id is None:
@@ -140,14 +142,19 @@ def send_prompt(text, prompt_id=None, timeout=10):
             body = r.json()
         except Exception:
             body = {"raw": r.text}
-        print(f"[RED] Sent id={prompt_id} status={status} → {text[:60]!r}")
-        log_entry = {"id": prompt_id, "prompt": text, "status_code": status, "response": body}
+        print(f"[RED] Sent id={prompt_id} attack={attack_id} status={status} → {text[:120]!r}")
+        log_entry = {
+            "id": prompt_id,
+            "attack_id": attack_id,
+            "prompt": text,
+            "status_code": status,
+            "response": body
+        }
         write_jsonl(LOG_PATH, log_entry)
     except Exception as e:
         print(f"[RED] Error sending id={prompt_id}: {e}")
-        log_entry = {"id": prompt_id, "prompt": text, "error": str(e)}
+        log_entry = {"id": prompt_id, "attack_id": attack_id, "prompt": text, "error": str(e)}
         write_jsonl(LOG_PATH, log_entry)
-
 
 # -------- Prompt builders --------
 def mutate_prompt(base, intensity=1):
@@ -156,14 +163,14 @@ def mutate_prompt(base, intensity=1):
         s = random.choice(MUTATORS)(s)
     return s
 
-
 def build_compound_prompt(attacks, num_parts=2):
     if not attacks:
         return ""
     parts = random.sample(attacks, k=min(num_parts, len(attacks)))
     text = " THEN ".join(a.get("template", "") for a in parts)
-    return insert_polite_wrapper(text)
-
+    # use combined id to reflect multiple sources
+    ids = "+".join(a.get("id", "noid") for a in parts)
+    return insert_polite_wrapper(text), f"combo+{ids}"
 
 def adaptive_generator(seed_attack, all_attacks):
     base = seed_attack.get("template", "")
@@ -177,36 +184,43 @@ def adaptive_generator(seed_attack, all_attacks):
         variants.append(v)
     return variants
 
-
 # -------- Main loop --------
 def run_diverse_loop(corpus, duration=60, delay=3):
     print(f"[RED] Running for {duration}s → BLUE_URL={BLUE_URL}")
     start_ts = time.time()
-    pool = random.sample(corpus, k=len(corpus)) if corpus else []
-    while time.time() - start_ts < duration:
-        if not pool:
-            pool = random.sample(corpus, k=len(corpus)) if corpus else []
-            print("[RED] reshuffled corpus for next cycle")
+    # ensure every attack has default weight
+    for a in corpus:
+        if "weight" not in a:
+            a["weight"] = 1.0
 
-        attack = pool.pop()
+    while time.time() - start_ts < duration:
+        attack = weighted_choice(corpus)
+        if not attack:
+            print("[RED] no attacks to send; sleeping")
+            time.sleep(delay)
+            continue
+
         attack_id = attack.get("id", "<no-id>")
         base_template = attack.get("template", "")
 
         mode = random.choices(["simple", "mutated", "compound", "adaptive"], weights=[30, 30, 20, 20])[0]
         if mode == "simple":
             prompt = base_template
+            chosen_attack_id = attack_id
         elif mode == "mutated":
             prompt = mutate_prompt(base_template, intensity=random.randint(1, 3))
+            chosen_attack_id = attack_id
         elif mode == "compound":
-            prompt = build_compound_prompt(corpus, num_parts=random.randint(2, 3))
+            prompt, combo_id = build_compound_prompt(corpus, num_parts=random.randint(2, 3))
+            chosen_attack_id = combo_id
         else:
             variants = adaptive_generator(attack, corpus)
             prompt = random.choice(variants) if variants else base_template
+            chosen_attack_id = attack_id
 
-        print(f"[RED] → id={attack_id} mode={mode} preview={base_template[:50]!r}")
-        send_prompt(prompt)
+        print(f"[RED] → id={attack_id} mode={mode} preview={base_template[:80]!r}")
+        send_prompt(prompt, attack_id=chosen_attack_id)
         time.sleep(delay)
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -226,8 +240,6 @@ def main():
     else:
         print(f"[RED] Unsupported mode: {args.mode}")
 
-
 if __name__ == "__main__":
     main()
-
 

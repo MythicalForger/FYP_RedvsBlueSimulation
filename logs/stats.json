@@ -1,6 +1,6 @@
 {
-  "attacks": 23,
-  "mitigations": 23,
+  "attacks": 31,
+  "mitigations": 31,
   "false_positives": 0,
-  "total_events": 406
+  "total_events": 506
 }

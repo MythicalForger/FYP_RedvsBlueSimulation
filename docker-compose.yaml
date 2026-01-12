@@ -104,6 +104,36 @@ services:
       - retrainer
     profiles: ["training"]
 
+  # Benchmark runner: executes benchmark_blue.py and writes JSONL to ./benchmarks
+  benchmark:
+    build: ./blue_agent
+    container_name: blue_benchmark
+    command: ["python", "benchmark_blue.py", "/app/out/blue_benchmark_results.jsonl"]
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt
+      - OUTPUT_PATH=/app/out/blue_benchmark_results.jsonl
+    volumes:
+      - ./benchmarks:/app/out
+      - ./logs:/app/logs
+      - ./red_agent:/app/red_agent   # 👈 ADD THIS LINE
+
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+
+  # Analyzer: reads the JSONL produced by benchmark and prints metrics
+  bench_analyzer:
+    build: ./blue_agent
+    container_name: blue_bench_analyzer
+    command: ["python", "analyze_blue_benchmark.py", "/app/out/blue_benchmark_results.jsonl"]
+    volumes:
+      - ./benchmarks:/app/out
+    networks:
+      - sandbox
+    depends_on:
+      - benchmark
+
 networks:
   sandbox:
     external: true

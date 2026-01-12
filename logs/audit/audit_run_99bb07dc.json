@@ -1,0 +1,17 @@
+{
+  "run_id": "99bb07dc",
+  "timestamp_utc": "2026-01-07T19:39:24.286010Z",
+  "params": {
+    "mode": "defended",
+    "duration_seconds": 30
+  },
+  "metrics": {
+    "total_prompts": 11,
+    "total_responses": 11,
+    "total_alerts": 3,
+    "total_harmful_writes": 0,
+    "detected_harmful": 0,
+    "detection_rate": null,
+    "avg_detection_latency_seconds": null
+  }
+}

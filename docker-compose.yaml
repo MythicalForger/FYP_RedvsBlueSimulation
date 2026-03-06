@@ -1,0 +1,163 @@
+# 🧩 Agentic AI Sandbox - Full Multi-Agent System
+# Runs Blue (defender), Red (attacker), Agent AI (LLM), and Monitoring Stack.
+# Includes optional training modules retrainer + suggestion_generator.
+
+services:
+  agent_ai:
+    build: ./agent_ai
+    container_name: agent_ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./ai_outputs:/app/outputs
+    networks:
+      - sandbox
+
+  blue_agent:
+    build: ./blue_agent
+    container_name: blue_agent
+    ports:
+      - "8001:8001"
+    environment:
+      - AGENT_AI_URL=http://agent_ai:8000/prompt
+      - USE_LLM_REASONING=true
+      - LLM_MODEL=gemma:2b
+      - ABLATION_MODE=${ABLATION_MODE}
+    volumes:
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock   # For Ollama if containerized
+    networks:
+      - sandbox
+    depends_on:
+      - agent_ai
+
+  red_agent:
+    build: ./red_agent
+    container_name: red_agent
+    volumes:
+      - ./logs:/app/logs
+      - ./red_agent:/app
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+
+  # ========================================================================
+  # MONITORING API - UPDATED WITH BENCHMARK VOLUME MOUNT
+  # ========================================================================
+  monitoring_api:
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile
+    container_name: monitoring_api
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./logs:/app/logs
+      - ./benchmarks:/app/benchmarks  # ← ADDED: Access to benchmark results
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt
+      - BENCHMARK_RESULTS=/app/benchmarks/blue_benchmark_results.jsonl  # ← ADDED: Path to benchmark file
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+
+  # ========================================================================
+  # MONITORING DASHBOARD - No changes needed
+  # ========================================================================
+  monitoring_dashboard:
+    build:
+      context: ./monitoring
+      dockerfile: dashboard.Dockerfile
+    container_name: monitoring_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sandbox
+    depends_on:
+      - monitoring_api
+
+  # 🧠 Offline Retrainer - learns from logs to adjust Red's scoring/weights
+  retrainer:
+    build: ./red_agent
+    container_name: retrainer
+    user: "${USER_ID}:${GROUP_ID}"
+    command: ["python", "retrainer.py"]
+    volumes:
+      - ./logs:/app/logs
+      - ./red_agent:/app
+    networks:
+      - sandbox
+    depends_on:
+      - monitoring_api
+    profiles: ["training"]
+
+  # 💡 Suggestion Generator - proposes new attack templates post-retraining
+  suggestion_generator:
+    build: ./red_agent
+    container_name: suggestion_generator
+    user: "${USER_ID}:${GROUP_ID}"
+    command: ["python", "suggestions.py"]
+    volumes:
+      - ./logs:/app/logs
+      - ./red_agent:/app
+    networks:
+      - sandbox
+    depends_on:
+      - retrainer
+    profiles: ["training"]
+
+  # Benchmark runner: executes benchmark_blue.py and writes JSONL to ./benchmarks
+  benchmark:
+    build: ./blue_agent
+    container_name: blue_benchmark
+    command: ["python", "benchmark_blue.py", "/app/out/blue_benchmark_results.jsonl"]
+    environment:
+      - BLUE_URL=http://blue_agent:8001/prompt
+      - OUTPUT_PATH=/app/out/blue_benchmark_results.jsonl
+    volumes:
+      - ./benchmarks:/app/out
+      - ./logs:/app/logs
+      - ./red_agent:/app/red_agent
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+
+  # Analyzer: reads the JSONL produced by benchmark and prints metrics
+  bench_analyzer:
+    build: ./blue_agent
+    container_name: blue_bench_analyzer
+    command: ["python", "analyze_blue_benchmark.py", "/app/out/blue_benchmark_results.jsonl"]
+    volumes:
+      - ./benchmarks:/app/out
+    networks:
+      - sandbox
+    depends_on:
+      - benchmark
+# 🧪 Real-World Framework Benchmarking
+  benchmarking:
+    build: ./benchmarking
+    container_name: benchmarking
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # Set via .env file
+    volumes:
+      - ./logs:/app/logs
+      - ./benchmarking/results:/app/results
+      - ./attacks.json:/app/attacks.json:ro  # Read-only access
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+      - agent_ai
+    profiles: ["benchmark"]  # Only runs when explicitly called
+networks:
+  sandbox:
+    external: true
+    name: agentic-sandbox

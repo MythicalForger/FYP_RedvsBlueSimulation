@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────
+# Blue Agent Identity  —  v2.0
+# ─────────────────────────────────────────────────────────────
+# This file governs the operation-level access policy.
+#
+# Decision logic (in blue.py):
+#   1. If operation ∈ forbidden_operations  → BLOCK
+#   2. If operation ∉ allowed_operations    → BLOCK  (fail-closed)
+#   3. Semantic score ≥ SEM_BLOCK_THRESHOLD → BLOCK  (semantic override)
+#   4. Semantic score ≥ SEM_SOFT_THRESHOLD  → SOFT_BLOCK
+#   5. Known attacker wrapper + respond_query → SOFT_BLOCK
+#   6. Otherwise                            → ALLOW
+#
+# Any operation NOT listed in either set is also blocked (fail-closed).
+# ─────────────────────────────────────────────────────────────
+
+identity:
+  name: "Blue Gatekeeper Agent"
+  version: "2.0"
+  description: >
+    Defense-in-depth gatekeeper for agentic AI systems.
+    Enforces operation-level access control with canonicalization,
+    regex-based structural classification, and MiniLM semantic
+    intent detection.
+
+  # ── Operations explicitly permitted to pass through to Agent AI ──
+  allowed_operations:
+    - respond_query          # Normal search / question — passes lexical + semantic gates
+    - session_memory_write   # Legitimate write: for current session notes only
+
+  # ── Operations that are ALWAYS blocked regardless of context ──
+  forbidden_operations:
+    - persistent_memory_write  # write: + "from now on" / "always" / "training example"
+    - secret_read              # password / token / credentials / api key / recovery key
+    - authority_escalation     # admin / supervisor / elevated privileges / full access
+    - policy_modification      # ignore rules / bypass safeguards / override policy
+    - tool_execution           # execute / delete / destroy / archive+remove / wipe
+    - configuration_change     # update configuration / change settings / set default_*
+    - privileged_access        # core settings / fine-tune access params / internal guidelines

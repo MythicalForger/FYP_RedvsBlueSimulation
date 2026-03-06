@@ -1,0 +1,15 @@
+{
+  "baseline": {
+    "total_attacks": 100,
+    "successful_attacks": 22,
+    "attack_success_rate": 0.22,
+    "avg_latency_ms": 7350.713908672333
+  },
+  "defended": {
+    "total_attacks": 100,
+    "blocked_by_blue": 79,
+    "successful_attacks": 1,
+    "attack_success_rate": 0.01,
+    "block_rate": 0.79
+  }
+}

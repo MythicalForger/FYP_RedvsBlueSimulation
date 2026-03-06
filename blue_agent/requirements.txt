@@ -1,0 +1,28 @@
+# -----------------------------
+# Core server
+# -----------------------------
+flask==3.0.0
+requests==2.31.0
+
+# -----------------------------
+# Text normalization
+# -----------------------------
+unidecode==1.3.7
+
+# -----------------------------
+# YAML parsing (identity.yaml)
+# -----------------------------
+pyyaml==6.0.1
+
+# -----------------------------
+# Semantic similarity (Layer 3)
+# Pin numpy<2 to avoid PyTorch 2.2.x / NumPy 2.x ABI mismatch
+# -----------------------------
+numpy<2
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers==2.7.0
+
+# -----------------------------
+# Benchmark analysis
+# -----------------------------
+# scikit-learn==1.3.2

@@ -1,0 +1,9 @@
+# generated data
+logs/
+benchmarks/*.jsonl
+*.jsonl
+output.txt
+ai_outputs/
+*.bak
+*.tar.gz
+.env

@@ -23,6 +23,7 @@ services:
       - AGENT_AI_URL=http://agent_ai:8000/prompt
       - USE_LLM_REASONING=true
       - LLM_MODEL=gemma:2b
+      - ABLATION_MODE=${ABLATION_MODE}
     volumes:
       - ./logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock   # For Ollama if containerized
@@ -44,6 +45,9 @@ services:
     depends_on:
       - blue_agent
 
+  # ========================================================================
+  # MONITORING API - UPDATED WITH BENCHMARK VOLUME MOUNT
+  # ========================================================================
   monitoring_api:
     build:
       context: ./monitoring
@@ -53,13 +57,18 @@ services:
       - "9000:9000"
     volumes:
       - ./logs:/app/logs
+      - ./benchmarks:/app/benchmarks  # ← ADDED: Access to benchmark results
     environment:
       - BLUE_URL=http://blue_agent:8001/prompt
+      - BENCHMARK_RESULTS=/app/benchmarks/blue_benchmark_results.jsonl  # ← ADDED: Path to benchmark file
     networks:
       - sandbox
     depends_on:
       - blue_agent
 
+  # ========================================================================
+  # MONITORING DASHBOARD - No changes needed
+  # ========================================================================
   monitoring_dashboard:
     build:
       context: ./monitoring
@@ -74,7 +83,7 @@ services:
     depends_on:
       - monitoring_api
 
-  # 🧠 Offline Retrainer - learns from logs to adjust Red’s scoring/weights
+  # 🧠 Offline Retrainer - learns from logs to adjust Red's scoring/weights
   retrainer:
     build: ./red_agent
     container_name: retrainer
@@ -115,8 +124,7 @@ services:
     volumes:
       - ./benchmarks:/app/out
       - ./logs:/app/logs
-      - ./red_agent:/app/red_agent   # 👈 ADD THIS LINE
-
+      - ./red_agent:/app/red_agent
     networks:
       - sandbox
     depends_on:
@@ -133,9 +141,23 @@ services:
       - sandbox
     depends_on:
       - benchmark
-
+# 🧪 Real-World Framework Benchmarking
+  benchmarking:
+    build: ./benchmarking
+    container_name: benchmarking
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # Set via .env file
+    volumes:
+      - ./logs:/app/logs
+      - ./benchmarking/results:/app/results
+      - ./attacks.json:/app/attacks.json:ro  # Read-only access
+    networks:
+      - sandbox
+    depends_on:
+      - blue_agent
+      - agent_ai
+    profiles: ["benchmark"]  # Only runs when explicitly called
 networks:
   sandbox:
     external: true
     name: agentic-sandbox
-

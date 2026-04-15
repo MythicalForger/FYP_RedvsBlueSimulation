@@ -8,8 +8,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
-COPY app.py .
+# Copy all agent code (app + core + helpers)
+COPY . .
 
 # Create logs and outputs folders
 RUN mkdir -p /app/logs /app/outputs
@@ -19,4 +19,3 @@ EXPOSE 8000
 
 # Start the Flask app
 CMD ["python3", "app.py"]
-

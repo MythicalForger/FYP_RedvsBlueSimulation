@@ -6,3 +6,4 @@ output.txt
 ai_outputs/
 *.bak
 *.tar.gz
+.env

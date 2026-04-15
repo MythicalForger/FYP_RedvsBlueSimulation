@@ -1,164 +1,165 @@
-from fastapi import FastAPI, Request, Body
+#!/usr/bin/env python3
+"""
+Monitoring API - Stats & Metrics Endpoint
+==========================================
+FastAPI service that provides real-time stats and benchmark metrics
+for the Red vs Blue agent simulation.
+
+Endpoints:
+  GET /health         - Health check
+  GET /stats          - Live simulation statistics
+  GET /events         - Recent AI events log
+  GET /alerts         - Security alerts log
+  GET /benchmark      - Benchmark performance metrics
+  GET /metrics        - Detailed metrics with decision breakdown
+"""
+
+import os
+import json
+import time
+from pathlib import Path
+from collections import Counter
+from typing import List, Dict
+
+import uvicorn
+from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio, json
-from pathlib import Path
-import uvicorn
-import threading
-import time
-import numpy as np
-from collections import Counter
-from log_utils import read_jsonl, ACTIVE_LOGS
+import asyncio
 
-# Use Docker container paths when running inside container
+# Import unified metrics module for consistent calculations
+from unified_metrics import compute_benchmark_metrics, load_benchmark_results
+
+# ──────────────────────────────────────────────────────────────
+# CONFIGURATION
+# ──────────────────────────────────────────────────────────────
+
+# Log directory paths
 if Path("/app").exists():
     # Running inside Docker container
     LOG_DIR = Path("/app/logs")
+    BENCHMARK_DIR = Path("/app/benchmarks")
 else:
     # Running locally
     ROOT = Path(__file__).resolve().parents[1]
     LOG_DIR = ROOT / "logs"
+    BENCHMARK_DIR = ROOT / "benchmarks"
 
+# Log file paths
 AI_EVENTS = LOG_DIR / "ai_events.jsonl"
 ALERTS = LOG_DIR / "alerts.jsonl"
-STATS = LOG_DIR / "stats.json"
 RED_SENT = LOG_DIR / "red_sent.jsonl"
+STATS = LOG_DIR / "stats.json"
 
-# Benchmark results path - handle both Docker and local
-if Path("/app").exists():
-    BENCHMARK_RESULTS = Path("/app/benchmarks/blue_benchmark_results.jsonl")
-else:
-    ROOT = Path(__file__).resolve().parents[1]
-    BENCHMARK_RESULTS = ROOT / "benchmarks" / "blue_benchmark_results.jsonl"
+# Benchmark results path - configurable via environment variable
+BENCHMARK_RESULTS = os.environ.get(
+    "BENCHMARK_RESULTS",
+    str(BENCHMARK_DIR / "blue_benchmark_results.jsonl")
+)
 
-app = FastAPI(title="Agentic Monitoring API")
+# Create directories
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+BENCHMARK_DIR.mkdir(parents=True, exist_ok=True)
 
+# Initialize log files
+for log_file in [AI_EVENTS, ALERTS, RED_SENT]:
+    log_file.touch(exist_ok=True)
+
+# ──────────────────────────────────────────────────────────────
+# FASTAPI APPLICATION
+# ──────────────────────────────────────────────────────────────
+
+app = FastAPI(title="AI Security Monitoring API", version="2.0")
+
+# Enable CORS for dashboard access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-subscribers = []  # for SSE streaming (if added later)
+# SSE subscribers for real-time updates
+subscribers = []
 
-# Global stats state
-stats_state = {"attacks": 0, "mitigations": 0, "false_positives": 0, "total_events": 0}
+# Stats state cache
+stats_state = {
+    "attacks": 0,
+    "mitigations": 0,
+    "false_positives": 0,
+    "total_events": 0,
+    "allowed": 0,
+    "block_rate": 0.0,
+    "success_rate": 0.0,
+}
 
+# ──────────────────────────────────────────────────────────────
+# UTILITY FUNCTIONS
+# ──────────────────────────────────────────────────────────────
 
-def compute_benchmark_metrics():
-    """Compute metrics from benchmark results if available."""
-    if not BENCHMARK_RESULTS.exists():
-        return None
+def read_jsonl(path: Path) -> List[Dict]:
+    """Read JSONL file and return list of records."""
+    if not path.exists():
+        return []
     
-    records = read_jsonl(BENCHMARK_RESULTS)
-    if not records:
-        return None
-    
-    y_true = []
-    y_pred = []
-    latencies = []
-    
-    for row in records:
-        if "error" in row:
-            continue
-        
-        label = row.get("label")
-        verdict = row.get("blue_verdict")
-        latency = row.get("latency_s")
-        
-        if label == "malicious":
-            true = 1
-        elif label == "benign":
-            true = 0
-        else:
-            continue
-        
-        is_block_like = False
-        if verdict in ("blocked", "soft_block"):
-            is_block_like = True
-        elif isinstance(verdict, str) and "blocked" in str(verdict).lower():
-            is_block_like = True
-        
-        pred = 1 if is_block_like else 0
-        y_true.append(true)
-        y_pred.append(pred)
-        
-        if isinstance(latency, (int, float)):
-            latencies.append(latency)
-    
-    if not y_true:
-        return None
-    
-    tp = sum(1 for t, p in zip(y_true, y_pred) if t == 1 and p == 1)
-    tn = sum(1 for t, p in zip(y_true, y_pred) if t == 0 and p == 0)
-    fp = sum(1 for t, p in zip(y_true, y_pred) if t == 0 and p == 1)
-    fn = sum(1 for t, p in zip(y_true, y_pred) if t == 1 and p == 0)
-    
-    detection_rate = tp / (tp + fn + 1e-9)
-    false_positive_rate = fp / (fp + tn + 1e-9)
-    precision = tp / (tp + fp + 1e-9) if (tp + fp) > 0 else 0.0
-    recall = detection_rate
-    f1 = 2 * precision * recall / (precision + recall + 1e-9) if (precision + recall) > 0 else 0.0
-    
-    latency_median = float(np.median(latencies) * 1000) if latencies else None
-    latency_p95 = float(np.percentile(latencies, 95) * 1000) if latencies else None
-    
-    return {
-        "total_samples": len(y_true),
-        "tp": tp, "tn": tn, "fp": fp, "fn": fn,
-        "detection_rate": round(detection_rate, 3),
-        "false_positive_rate": round(false_positive_rate, 3),
-        "precision": round(precision, 3),
-        "recall": round(recall, 3),
-        "f1_score": round(f1, 3),
-        "latency_median_ms": round(latency_median, 1) if latency_median else None,
-        "latency_p95_ms": round(latency_p95, 1) if latency_p95 else None
-    }
+    rows = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return rows
 
 
 def update_stats_from_logs():
-    """Update stats by reading all existing logs."""
+    """
+    Update cached stats by reading all existing logs.
+    Called periodically to keep stats fresh.
+    """
     global stats_state
-    
+
     events = read_jsonl(AI_EVENTS)
     alerts = read_jsonl(ALERTS)
-    red_sent = read_jsonl(RED_SENT)  # Source of truth for all attacks sent
-    
-    # Reset stats
-    stats_state = {"attacks": 0, "mitigations": 0, "false_positives": 0, "total_events": 0, 
-                   "allowed": 0, "block_rate": 0.0, "success_rate": 0.0}
-    
-    # Count ALL attacks from red_sent.jsonl (source of truth - every attack sent by red agent)
+    red_sent = read_jsonl(RED_SENT)
+
+    stats_state = {
+        "attacks": 0,
+        "mitigations": 0,
+        "false_positives": 0,
+        "total_events": 0,
+        "allowed": 0,
+        "block_rate": 0.0,
+        "success_rate": 0.0,
+    }
+
+    # Count attacks and outcomes
     stats_state["attacks"] = len(red_sent)
-    
-    # Count mitigations from red_sent.jsonl where status_code == 403 (blocked)
     mitigations = sum(1 for r in red_sent if r.get("status_code") == 403)
     stats_state["mitigations"] = mitigations
-    
-    # Count allowed requests (status_code == 200)
     allowed = sum(1 for r in red_sent if r.get("status_code") == 200)
     stats_state["allowed"] = allowed
-    
-    # Calculate block rate
+
+    # Calculate rates
     if stats_state["attacks"] > 0:
         stats_state["block_rate"] = round(mitigations / stats_state["attacks"], 3)
         stats_state["success_rate"] = round(allowed / stats_state["attacks"], 3)
-    
-    # Count total events
+
     stats_state["total_events"] = len(events)
-    
-    # Calculate false positives from benchmark data if available
-    benchmark_metrics = compute_benchmark_metrics()
+
+    # Get false positives from benchmark metrics
+    benchmark_metrics = compute_benchmark_metrics(load_benchmark_results(BENCHMARK_RESULTS))
     if benchmark_metrics:
         stats_state["false_positives"] = benchmark_metrics.get("fp", 0)
         stats_state["benchmark_metrics"] = benchmark_metrics
     else:
-        # Fallback: count benign requests that were blocked (if we can identify them)
-        # This is a simplified approach - ideally use benchmark data
         stats_state["false_positives"] = 0
-    
-    # Save stats
+
+    # Save stats to file (for other tools to read)
     try:
         with open(STATS, "w", encoding="utf-8") as f:
             json.dump(stats_state, f, indent=2)
@@ -166,60 +167,144 @@ def update_stats_from_logs():
         pass
 
 
-
+# ──────────────────────────────────────────────────────────────
+# API ENDPOINTS
+# ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health_check():
-    """Simple health check endpoint."""
-    return {"status": "healthy", "service": "monitoring_api"}
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": "monitoring_api",
+        "version": "2.0",
+        "log_dir": str(LOG_DIR),
+        "benchmark_path": BENCHMARK_RESULTS,
+    }
 
 
 @app.get("/stats")
 def get_stats():
-    """Return basic statistics."""
-    # Update stats from logs
-    update_stats_from_logs()
-    return JSONResponse(stats_state)
+    """
+    Live simulation statistics from red_sent.jsonl.
+    
+    Returns:
+        - attacks: Total attack requests sent
+        - mitigations: Requests blocked by Blue (HTTP 403)
+        - allowed: Requests that passed through (HTTP 200)
+        - block_rate: Percentage of requests blocked
+        - success_rate: Percentage of requests allowed
+        - false_positives: FP count from benchmark
+        - total_events: Total log events
+    """
+    red_sent = read_jsonl(RED_SENT)
+    events = read_jsonl(AI_EVENTS)
+
+    attacks = len(red_sent)
+    mitigations = sum(1 for r in red_sent if r.get("status_code") == 403)
+    allowed = sum(1 for r in red_sent if r.get("status_code") == 200)
+    block_rate = round(mitigations / attacks, 3) if attacks > 0 else 0.0
+    success_rate = round(allowed / attacks, 3) if attacks > 0 else 0.0
+
+    # Get false positives from benchmark data using unified metrics
+    benchmark_metrics = compute_benchmark_metrics(load_benchmark_results(BENCHMARK_RESULTS))
+    false_positives = benchmark_metrics.get("fp", 0) if benchmark_metrics else 0
+
+    return JSONResponse({
+        "attacks": attacks,
+        "mitigations": mitigations,
+        "allowed": allowed,
+        "block_rate": block_rate,
+        "success_rate": success_rate,
+        "false_positives": false_positives,
+        "total_events": len(events),
+    })
 
 
 @app.get("/events")
 def get_events(limit: int = 100):
-    """Fetch recent events."""
+    """
+    Get recent AI events from log.
+    
+    Args:
+        limit: Maximum number of events to return (default: 100)
+    
+    Returns:
+        List of most recent events
+    """
     data = read_jsonl(AI_EVENTS)
     return JSONResponse(data[-limit:])
 
 
 @app.get("/alerts")
 def get_alerts():
-    """Fetch alerts for timeline view."""
+    """
+    Get all security alerts.
+    
+    Returns:
+        List of all alerts from alerts.jsonl
+    """
     data = read_jsonl(ALERTS)
     return JSONResponse(data)
 
 
 @app.get("/benchmark")
 def get_benchmark():
-    """Fetch benchmark metrics if available."""
-    metrics = compute_benchmark_metrics()
+    """
+    Full benchmark metrics from blue_benchmark_results.jsonl.
+    
+    Uses unified_metrics module for consistent calculation with terminal analyzer.
+    
+    Returns:
+        Dictionary with classification metrics:
+        - total_samples, tp, tn, fp, fn
+        - accuracy, detection_rate, false_positive_rate
+        - precision, recall, f1_score
+        - latency_median_ms, latency_p95_ms
+    """
+    print(f"[Benchmark] Reading from: {BENCHMARK_RESULTS}")
+    
+    records = load_benchmark_results(BENCHMARK_RESULTS)
+    print(f"[Benchmark] Loaded {len(records)} records")
+    
+    metrics = compute_benchmark_metrics(records)
+    
     if metrics:
+        print(f"[Benchmark] Metrics computed: {metrics.get('total_samples')} valid samples")
         return JSONResponse(metrics)
-    return JSONResponse({"error": "No benchmark data available"})
+    else:
+        print("[Benchmark] No valid data found")
+        return JSONResponse({
+            "error": "No benchmark data available",
+            "benchmark_path": BENCHMARK_RESULTS,
+            "help": "Run: docker compose run --rm benchmark"
+        })
 
 
 @app.get("/metrics")
 def get_detailed_metrics():
-    """Get detailed metrics including decision breakdown."""
+    """
+    Detailed metrics including decision breakdown.
+    
+    Returns:
+        - decisions: Counter of Blue agent decisions
+        - attack_outcomes: Counter of attack results (blocked/allowed/other)
+        - total_attacks: Total attacks from red agent
+        - total_alerts: Total security alerts
+        - time_range: Earliest and latest event timestamps
+    """
     events = read_jsonl(AI_EVENTS)
     alerts = read_jsonl(ALERTS)
     red_sent = read_jsonl(RED_SENT)
-    
-    # Decision breakdown
+
+    # Count Blue agent decisions
     decisions = Counter()
     for e in events:
         if e.get("role") == "blue_decision":
             decision = e.get("decision") or e.get("verdict", "unknown")
             decisions[decision] += 1
-    
-    # Attack type breakdown
+
+    # Count attack outcomes
     attack_types = Counter()
     for r in red_sent:
         status = r.get("status_code", 0)
@@ -229,13 +314,10 @@ def get_detailed_metrics():
             attack_types["allowed"] += 1
         else:
             attack_types["other"] += 1
-    
-    # Time-based metrics
-    timestamps = []
-    for r in red_sent:
-        if "ts" in r:
-            timestamps.append(r["ts"])
-    
+
+    # Get time range
+    timestamps = [r["ts"] for r in red_sent if "ts" in r]
+
     return JSONResponse({
         "decisions": dict(decisions),
         "attack_outcomes": dict(attack_types),
@@ -243,18 +325,47 @@ def get_detailed_metrics():
         "total_alerts": len(alerts),
         "time_range": {
             "earliest": min(timestamps) if timestamps else None,
-            "latest": max(timestamps) if timestamps else None
-        }
+            "latest": max(timestamps) if timestamps else None,
+        },
     })
 
 
 @app.post("/internal/publish")
 async def internal_publish(payload: dict = Body(...)):
-    """Internal endpoint used by log_watcher to push events."""
+    """
+    Internal endpoint for publishing real-time updates to SSE subscribers.
+    """
     for queue in subscribers:
         await queue.put(payload)
     return {"ok": True}
 
 
+# ──────────────────────────────────────────────────────────────
+# STARTUP & BACKGROUND TASKS
+# ──────────────────────────────────────────────────────────────
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize stats on startup."""
+    print("="*70)
+    print("🚀 Monitoring API Starting")
+    print("="*70)
+    print(f"Log directory:       {LOG_DIR}")
+    print(f"Benchmark path:      {BENCHMARK_RESULTS}")
+    print(f"AI events:           {AI_EVENTS}")
+    print(f"Alerts:              {ALERTS}")
+    print(f"Red sent:            {RED_SENT}")
+    print("="*70)
+    
+    # Update stats from existing logs
+    update_stats_from_logs()
+    print("✅ Initial stats loaded")
+
+
+# ──────────────────────────────────────────────────────────────
+# MAIN
+# ──────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    uvicorn.run("stats_api:app", host="0.0.0.0", port=9000)
+    print("Starting Monitoring API on port 9000...")
+    uvicorn.run("stats_api:app", host="0.0.0.0", port=9000, reload=False)

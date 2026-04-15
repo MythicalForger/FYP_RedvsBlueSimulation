@@ -1,0 +1,50 @@
+{
+  "A": {
+    "mode": "structural",
+    "metrics": {
+      "total": 49,
+      "tp": 23,
+      "tn": 4,
+      "fp": 0,
+      "fn": 22,
+      "precision": 1.0,
+      "recall_tpr": 0.5111,
+      "fpr": 0.0,
+      "f1": 0.6765,
+      "median_latency_ms": 4.91,
+      "p95_latency_ms": 7.83
+    }
+  },
+  "B": {
+    "mode": "semantic",
+    "metrics": {
+      "total": 49,
+      "tp": 40,
+      "tn": 3,
+      "fp": 1,
+      "fn": 5,
+      "precision": 0.9756,
+      "recall_tpr": 0.8889,
+      "fpr": 0.25,
+      "f1": 0.9302,
+      "median_latency_ms": 18.08,
+      "p95_latency_ms": 26.52
+    }
+  },
+  "C": {
+    "mode": "full",
+    "metrics": {
+      "total": 49,
+      "tp": 41,
+      "tn": 3,
+      "fp": 1,
+      "fn": 4,
+      "precision": 0.9762,
+      "recall_tpr": 0.9111,
+      "fpr": 0.25,
+      "f1": 0.9425,
+      "median_latency_ms": 18.1,
+      "p95_latency_ms": 25.49
+    }
+  }
+}

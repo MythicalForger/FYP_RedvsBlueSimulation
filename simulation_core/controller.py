@@ -169,60 +169,45 @@ def run_experiment(duration_seconds=60, mode="baseline", build=False, dashboard=
 
     reset_logs()
 
-    # baseline: start agent_ai + blue_agent (no red), then later start red
+    # Inject run_id as env variable into containers
+    os.environ["RUN_ID"] = run_id
+
     services_start = ["agent_ai", "blue_agent"]
-    
-    # Add monitoring services if dashboard is requested
+
     if dashboard:
         services_start.extend(["monitoring_api", "monitoring_dashboard"])
         print("[CTRL] Including monitoring dashboard...")
-    
 
     compose_up(services_start, build=build)
-    # small wait for services to come up
-    print("[CTRL] waiting for services to initialize...")
     time.sleep(4)
 
-    # now start red agent
     if mode in ("baseline", "defended", "attack"):
         compose_up(["red_agent"], build=False)
         print("[CTRL] red_agent started.")
-    else:
-        print("[CTRL] unknown mode; not starting red agent.")
-    
-    # Show dashboard URL if enabled
+
     if dashboard:
         print("\n" + "="*60)
         print("📊 MONITORING DASHBOARD AVAILABLE!")
         print("🌐 Dashboard URL: http://localhost:8501")
-        print("🔧 Monitoring API: http://localhost:9000")
         print("="*60 + "\n")
 
-
-    # sleep while simulation runs
     start = time.time()
-    print(f"[CTRL] simulation running for {duration_seconds} seconds...")
     try:
         while time.time() - start < duration_seconds:
             time.sleep(1)
     except KeyboardInterrupt:
         print("[CTRL] interrupted by user.")
 
-    # stop red to end the run
-    try:
-        compose_stop(["red_agent"])
-        print("[CTRL] red_agent stopped.")
-    except Exception as e:
-        print("[CTRL] failed to stop red_agent:", e)
+    compose_stop(["red_agent"])
+    print("[CTRL] red_agent stopped.")
 
-    # collect logs and compute metrics
     events = parse_jsonl(AI_EVENTS)
     alerts = parse_jsonl(ALERTS)
-    metrics = compute_metrics(events, alerts)
-    params = {"mode": mode, "duration_seconds": duration_seconds}
-    audit_path = save_audit(run_id, params, metrics)
-    print("[CTRL] metrics:", json.dumps(metrics, indent=2))
-    return audit_path, metrics
+
+    # Filter only current run
+    events = [e for e in events if e.get("run_id") == run_id]
+    alerts = [a for a in alerts if a.get]()
+
 
 def main():
     p = argparse.ArgumentParser()

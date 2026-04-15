@@ -1,0 +1,53 @@
+{
+  "A": {
+    "config_mode": "structural",
+    "metrics": {
+      "tp": 23,
+      "tn": 4,
+      "fp": 0,
+      "fn": 22,
+      "total": 49,
+      "accuracy": 0.551,
+      "tpr": 0.5111,
+      "fpr": 0.0,
+      "precision": 1.0,
+      "f1": 0.6765,
+      "median_latency_ms": 5.2,
+      "p95_latency_ms": 8.38
+    }
+  },
+  "B": {
+    "config_mode": "semantic",
+    "metrics": {
+      "tp": 0,
+      "tn": 0,
+      "fp": 0,
+      "fn": 0,
+      "total": 0,
+      "accuracy": 0,
+      "tpr": 0,
+      "fpr": 0,
+      "precision": 0,
+      "f1": 0,
+      "median_latency_ms": 0,
+      "p95_latency_ms": 0
+    }
+  },
+  "C": {
+    "config_mode": "full",
+    "metrics": {
+      "tp": 0,
+      "tn": 0,
+      "fp": 0,
+      "fn": 0,
+      "total": 0,
+      "accuracy": 0,
+      "tpr": 0,
+      "fpr": 0,
+      "precision": 0,
+      "f1": 0,
+      "median_latency_ms": 0,
+      "p95_latency_ms": 0
+    }
+  }
+}
